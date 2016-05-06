@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"go/ast"
 	"go/parser"
 
 	"golang.org/x/tools/go/loader"
@@ -19,7 +20,18 @@ func apiLoader() (*loader.Program, error) {
 }
 
 func parse(prog *loader.Program) error {
-	fmt.Println(prog)
+	files := prog.Imported["github.com/tsuru/tsuru/api"].Files
+	for _, f := range files {
+		for _, object := range f.Scope.Objects {
+			if object.Kind == ast.Fun && object.Name == "serviceList" {
+				fmt.Printf("handler: %s - %#v\n", object.Name, object.Decl.(*ast.FuncDecl).Doc)
+				commentGroup := object.Decl.(*ast.FuncDecl).Doc
+				for _, comment := range commentGroup.List {
+					fmt.Println(comment.Text)
+				}
+			}
+		}
+	}
 	return nil
 }
 
