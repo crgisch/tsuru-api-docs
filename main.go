@@ -39,12 +39,17 @@ func parse(prog *loader.Program) error {
 	files := prog.Imported["github.com/tsuru/tsuru/api"].Files
 	for _, f := range files {
 		for _, object := range f.Scope.Objects {
-			if object.Kind == ast.Fun && object.Name == "serviceList" {
+			if object.Kind == ast.Fun {
+				// if object.Kind == ast.Fun && object.Name == "serviceList" {
 				ok := isHandler(object)
 				if !ok {
 					continue
 				}
 				commentGroup := object.Decl.(*ast.FuncDecl).Doc
+				if commentGroup == nil {
+					fmt.Printf("missing docs for %s\n", object.Name)
+					continue
+				}
 				for _, comment := range commentGroup.List {
 					fmt.Println(comment.Text)
 				}
