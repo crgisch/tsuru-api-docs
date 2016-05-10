@@ -16,6 +16,7 @@ func apiLoader() (*loader.Program, error) {
 	var ldr loader.Config
 	ldr.ParserMode = parser.ParseComments
 	ldr.Import("github.com/tsuru/tsuru/api")
+	ldr.Import("github.com/tsuru/tsuru/provision/docker")
 	return ldr.Load()
 }
 
@@ -36,7 +37,13 @@ func isHandler(object *ast.Object) bool {
 }
 
 func parse(prog *loader.Program) error {
-	files := prog.Imported["github.com/tsuru/tsuru/api"].Files
+	files := []*ast.File{}
+	for _, f := range prog.Imported["github.com/tsuru/tsuru/api"].Files {
+		files = append(files, f)
+	}
+	for _, f := range prog.Imported["github.com/tsuru/tsuru/provision/docker"].Files {
+		files = append(files, f)
+	}
 	for _, f := range files {
 		for _, object := range f.Scope.Objects {
 			if object.Kind == ast.Fun {
@@ -60,11 +67,13 @@ func parse(prog *loader.Program) error {
 }
 
 func main() {
+	fmt.Println("loading")
 	prog, err := apiLoader()
 	if err != nil {
 		fmt.Println("error loading code ", err)
 		return
 	}
+	fmt.Println("loaded")
 	err = parse(prog)
 	if err != nil {
 		fmt.Println("error parsing api ", err)
