@@ -36,6 +36,20 @@ func isHandler(object *ast.Object) bool {
 	return false
 }
 
+func shouldBeIgnored(objectName string) bool {
+	ignoreList := []string{
+		"writeEnvVars", "fullHealthcheck", "setVersionHeadersMiddleware",
+		"authTokenMiddleware", "runDelayedHandler", "errorHandlingMiddleware",
+		"contextClearerMiddleware", "flushingWriterMiddleware", "setRequestIDHeaderMiddleware",
+	}
+	for _, name := range ignoreList {
+		if name == objectName {
+			return true
+		}
+	}
+	return false
+}
+
 func parse(prog *loader.Program) error {
 	files := []*ast.File{}
 	for _, f := range prog.Imported["github.com/tsuru/tsuru/api"].Files {
@@ -50,6 +64,9 @@ func parse(prog *loader.Program) error {
 				// if object.Kind == ast.Fun && object.Name == "serviceList" {
 				ok := isHandler(object)
 				if !ok {
+					continue
+				}
+				if shouldBeIgnored(object.Name) {
 					continue
 				}
 				commentGroup := object.Decl.(*ast.FuncDecl).Doc
