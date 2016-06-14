@@ -5,12 +5,23 @@
 package main
 
 import (
+	"bytes"
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
+	"regexp"
+	"strings"
 
 	"golang.org/x/tools/go/loader"
+	"gopkg.in/yaml.v2"
 )
+
+var searchFlag = flag.String("search", "", "return handlers matching search regexp")
+var noSearchFlag = flag.String("no-search", "", "return handlers NOT matching search regexp")
+var methodFlag = flag.String("method", "", "return handlers with method")
+var noMethodFlag = flag.String("no-method", "", "return handlers EXCEPT with method")
 
 func apiLoader() (*loader.Program, error) {
 	var ldr loader.Config
@@ -62,7 +73,6 @@ func parse(prog *loader.Program) error {
 	for _, f := range files {
 		for _, object := range f.Scope.Objects {
 			if object.Kind == ast.Fun {
-				// if object.Kind == ast.Fun && object.Name == "serviceList" {
 				ok := isHandler(object)
 				if !ok {
 					continue
@@ -75,8 +85,9 @@ func parse(prog *loader.Program) error {
 					fmt.Printf("missing docs for %s\n", object.Name)
 					continue
 				}
-				for _, comment := range commentGroup.List {
-					fmt.Println(comment.Text)
+				err := handleComments(prog, object, commentGroup)
+				if err != nil {
+					fmt.Printf("error handling comments for %s: %s\n", object.Name, err)
 				}
 			}
 		}
@@ -84,14 +95,69 @@ func parse(prog *loader.Program) error {
 	return nil
 }
 
+func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.CommentGroup) error {
+	if *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == "" {
+		for _, comment := range commentGroup.List {
+			fmt.Println(comment.Text)
+		}
+		return nil
+	}
+	var buf bytes.Buffer
+	for _, comment := range commentGroup.List {
+		buf.WriteString(strings.Replace(comment.Text, "// ", "", -1))
+		buf.WriteString("\n")
+	}
+	var parsed map[string]interface{}
+	err := yaml.Unmarshal(buf.Bytes(), &parsed)
+	if err != nil {
+		return err
+	}
+	method, ok := parsed["method"].(string)
+	if !ok {
+		return fmt.Errorf("invalid method declaration for %s: %v", object.Name, parsed["method"])
+	}
+	if *methodFlag != "" {
+		if strings.ToLower(*methodFlag) != strings.ToLower(method) {
+			return nil
+		}
+	}
+	if *noMethodFlag != "" {
+		if strings.ToLower(*noMethodFlag) == strings.ToLower(method) {
+			return nil
+		}
+	}
+	if *searchFlag != "" || *noSearchFlag != "" {
+		value := *searchFlag
+		negate := true
+		if value == "" {
+			value = *noSearchFlag
+			negate = false
+		}
+		var funcBuf bytes.Buffer
+		printer.Fprint(&funcBuf, prog.Fset, object.Decl)
+		re, err := regexp.Compile(value)
+		if err != nil {
+			return err
+		}
+		isMatch := re.Match(funcBuf.Bytes())
+		if negate {
+			isMatch = !isMatch
+		}
+		if isMatch {
+			return nil
+		}
+	}
+	fmt.Println(object.Name)
+	return nil
+}
+
 func main() {
-	fmt.Println("loading")
+	flag.Parse()
 	prog, err := apiLoader()
 	if err != nil {
 		fmt.Println("error loading code ", err)
 		return
 	}
-	fmt.Println("loaded")
 	err = parse(prog)
 	if err != nil {
 		fmt.Println("error parsing api ", err)
