@@ -18,10 +18,12 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var searchFlag = flag.String("search", "", "return handlers matching search regexp")
-var noSearchFlag = flag.String("no-search", "", "return handlers NOT matching search regexp")
-var methodFlag = flag.String("method", "", "return handlers with method")
-var noMethodFlag = flag.String("no-method", "", "return handlers EXCEPT with method")
+var (
+	searchFlag   = flag.String("search", "", "return handlers matching search regexp")
+	noSearchFlag = flag.String("no-search", "", "return handlers NOT matching search regexp")
+	methodFlag   = flag.String("method", "", "return handlers with method")
+	noMethodFlag = flag.String("no-method", "", "return handlers EXCEPT with method")
+)
 
 func apiLoader() (*loader.Program, error) {
 	var ldr loader.Config
