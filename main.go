@@ -100,7 +100,7 @@ func parse(prog *loader.Program) error {
 func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.CommentGroup) error {
 	if *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == "" {
 		for _, comment := range commentGroup.List {
-			fmt.Println(comment.Text)
+			fmt.Println(strings.Replace(comment.Text, "// ", "", -1))
 		}
 		return nil
 	}
