@@ -72,6 +72,9 @@ func parse(prog *loader.Program) error {
 	for _, f := range prog.Imported["github.com/tsuru/tsuru/provision/docker"].Files {
 		files = append(files, f)
 	}
+	if *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == "" {
+		fmt.Println("handlers:")
+	}
 	for _, f := range files {
 		for _, object := range f.Scope.Objects {
 			if object.Kind == ast.Fun {
@@ -100,7 +103,11 @@ func parse(prog *loader.Program) error {
 func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.CommentGroup) error {
 	if *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == "" {
 		for _, comment := range commentGroup.List {
-			fmt.Println(strings.Replace(comment.Text, "// ", "", -1))
+			if strings.Contains(comment.Text, "title:") {
+				fmt.Println(strings.Replace(comment.Text, "// ", "  - ", -1))
+			} else {
+				fmt.Println(strings.Replace(comment.Text, "// ", "    ", -1))
+			}
 		}
 		return nil
 	}
