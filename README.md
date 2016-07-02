@@ -23,3 +23,27 @@ tsuru-api-docs
 ```
 tsuru-api-docs | grep missing
 ```
+
+### List handlers with a specific method
+
+```
+tsuru-api-docs -method GET
+```
+
+### List handlers without a specific method
+
+```
+tsuru-api-docs -no-method GET
+```
+
+### List handlers matching search regexp
+
+```
+tsuru-api-docs -search "event\.New"
+```
+
+### List handlers NOT matching search regexp
+
+```
+tsuru-api-docs -no-search "event\.New"
+```
