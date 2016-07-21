@@ -25,6 +25,10 @@ var (
 	noMethodFlag = flag.String("no-method", "", "return handlers EXCEPT with method")
 )
 
+func isListMode() bool {
+	return *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == ""
+}
+
 func apiLoader() (*loader.Program, error) {
 	var ldr loader.Config
 	ldr.ParserMode = parser.ParseComments
@@ -65,17 +69,20 @@ func shouldBeIgnored(objectName string) bool {
 }
 
 func parse(prog *loader.Program) error {
-	files := []*ast.File{}
-	for _, f := range prog.Imported["github.com/tsuru/tsuru/api"].Files {
-		files = append(files, f)
-	}
-	for _, f := range prog.Imported["github.com/tsuru/tsuru/provision/docker"].Files {
-		files = append(files, f)
-	}
-	if *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == "" {
+	if isListMode() {
 		fmt.Println("handlers:")
 	}
-	for _, f := range files {
+	for _, pkg := range prog.InitialPackages() {
+		err := parsePkg(prog, pkg)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func parsePkg(prog *loader.Program, pkg *loader.PackageInfo) error {
+	for _, f := range pkg.Files {
 		for _, object := range f.Scope.Objects {
 			if object.Kind == ast.Fun {
 				ok := isHandler(object)
@@ -90,7 +97,7 @@ func parse(prog *loader.Program) error {
 					fmt.Printf("missing docs for %s\n", object.Name)
 					continue
 				}
-				err := handleComments(prog, object, commentGroup)
+				err := handleComments(prog, object, commentGroup, pkg)
 				if err != nil {
 					fmt.Printf("error handling comments for %s: %s\n", object.Name, err)
 				}
@@ -100,8 +107,8 @@ func parse(prog *loader.Program) error {
 	return nil
 }
 
-func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.CommentGroup) error {
-	if *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == "" {
+func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.CommentGroup, pkg *loader.PackageInfo) error {
+	if isListMode() {
 		for _, comment := range commentGroup.List {
 			if strings.Contains(comment.Text, "title:") {
 				fmt.Println(strings.Replace(comment.Text, "// ", "  - ", -1))
@@ -156,7 +163,7 @@ func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.
 			return nil
 		}
 	}
-	fmt.Println(object.Name)
+	fmt.Printf("%s.%s\n", pkg.String(), object.Name)
 	return nil
 }
 
