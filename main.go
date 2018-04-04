@@ -58,7 +58,7 @@ func shouldBeIgnored(objectName string) bool {
 		"writeEnvVars", "fullHealthcheck", "setVersionHeadersMiddleware",
 		"authTokenMiddleware", "runDelayedHandler", "errorHandlingMiddleware",
 		"contextClearerMiddleware", "flushingWriterMiddleware", "setRequestIDHeaderMiddleware",
-		"bsEnvSetHandler", "bsConfigGetHandler", "bsUpgradeHandler",
+		"bsEnvSetHandler", "bsConfigGetHandler", "bsUpgradeHandler", "contentHijacker",
 	}
 	for _, name := range ignoreList {
 		if name == objectName {
