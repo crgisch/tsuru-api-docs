@@ -6,15 +6,15 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/printer"
 	"regexp"
 	"strings"
 
-	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/packages"
 	"gopkg.in/yaml.v2"
 )
 
@@ -29,12 +29,22 @@ func isListMode() bool {
 	return *searchFlag == "" && *methodFlag == "" && *noSearchFlag == "" && *noMethodFlag == ""
 }
 
-func apiLoader() (*loader.Program, error) {
-	var ldr loader.Config
-	ldr.ParserMode = parser.ParseComments
-	ldr.Import("github.com/tsuru/tsuru/api")
-	ldr.Import("github.com/tsuru/tsuru/provision/docker")
-	return ldr.Load()
+func apiLoader() ([]*packages.Package, error) {
+	cfg := &packages.Config{
+		Mode: packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedImports | packages.NeedDeps | packages.NeedCompiledGoFiles,
+	}
+	pkgsStr := []string{
+		"github.com/tsuru/tsuru/api",
+		"github.com/tsuru/tsuru/provision/docker",
+	}
+	pkgs, err := packages.Load(cfg, pkgsStr...)
+	if err != nil {
+		return nil, err
+	}
+	if packages.PrintErrors(pkgs) > 0 {
+		return nil, errors.New("errors reading pkgs")
+	}
+	return pkgs, err
 }
 
 func isHandler(object *ast.Object) bool {
@@ -68,12 +78,12 @@ func shouldBeIgnored(objectName string) bool {
 	return false
 }
 
-func parse(prog *loader.Program) error {
+func parse(pkgs []*packages.Package) error {
 	if isListMode() {
 		fmt.Println("handlers:")
 	}
-	for _, pkg := range prog.InitialPackages() {
-		err := parsePkg(prog, pkg)
+	for _, pkg := range pkgs {
+		err := parsePkg(pkg)
 		if err != nil {
 			return err
 		}
@@ -81,33 +91,35 @@ func parse(prog *loader.Program) error {
 	return nil
 }
 
-func parsePkg(prog *loader.Program, pkg *loader.PackageInfo) error {
-	for _, f := range pkg.Files {
-		for _, object := range f.Scope.Objects {
-			if object.Kind == ast.Fun {
-				ok := isHandler(object)
-				if !ok {
-					continue
-				}
-				if shouldBeIgnored(object.Name) {
-					continue
-				}
-				commentGroup := object.Decl.(*ast.FuncDecl).Doc
-				if commentGroup == nil {
-					fmt.Printf("missing docs for %s\n", object.Name)
-					continue
-				}
-				err := handleComments(prog, object, commentGroup, pkg)
-				if err != nil {
-					fmt.Printf("error handling comments for %s: %s\n", object.Name, err)
-				}
+func parsePkg(pkg *packages.Package) error {
+	for i, _ := range pkg.CompiledGoFiles {
+		fileAst := pkg.Syntax[i]
+		for _, object := range fileAst.Scope.Objects {
+			if object.Kind != ast.Fun {
+				continue
+			}
+			ok := isHandler(object)
+			if !ok {
+				continue
+			}
+			if shouldBeIgnored(object.Name) {
+				continue
+			}
+			commentGroup := object.Decl.(*ast.FuncDecl).Doc
+			if commentGroup == nil {
+				fmt.Printf("missing docs for %s\n", object.Name)
+				continue
+			}
+			err := handleComments(object, commentGroup, pkg)
+			if err != nil {
+				fmt.Printf("error handling comments for %s: %s\n", object.Name, err)
 			}
 		}
 	}
 	return nil
 }
 
-func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.CommentGroup, pkg *loader.PackageInfo) error {
+func handleComments(object *ast.Object, commentGroup *ast.CommentGroup, pkg *packages.Package) error {
 	if isListMode() {
 		for _, comment := range commentGroup.List {
 			if strings.Contains(comment.Text, "title:") {
@@ -150,7 +162,7 @@ func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.
 			negate = false
 		}
 		var funcBuf bytes.Buffer
-		printer.Fprint(&funcBuf, prog.Fset, object.Decl)
+		printer.Fprint(&funcBuf, pkg.Fset, object.Decl)
 		re, err := regexp.Compile(value)
 		if err != nil {
 			return err
@@ -169,12 +181,12 @@ func handleComments(prog *loader.Program, object *ast.Object, commentGroup *ast.
 
 func main() {
 	flag.Parse()
-	prog, err := apiLoader()
+	pkgs, err := apiLoader()
 	if err != nil {
 		fmt.Println("error loading code ", err)
 		return
 	}
-	err = parse(prog)
+	err = parse(pkgs)
 	if err != nil {
 		fmt.Println("error parsing api ", err)
 		return
