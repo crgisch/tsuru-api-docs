@@ -52,15 +52,17 @@ func isHandler(object *ast.Object) bool {
 	if len(params) < 2 {
 		return false
 	}
-	for _, param := range params {
-		t, ok := param.Type.(*ast.SelectorExpr)
-		if ok {
-			if t.Sel.Name == "ResponseWriter" {
-				return true
-			}
+	paramType, ok := params[0].Type.(*ast.SelectorExpr)
+	if !ok || paramType.Sel.Name != "ResponseWriter" {
+		return false
+	}
+	if len(params) == 3 {
+		paramType, ok = params[2].Type.(*ast.SelectorExpr)
+		if !ok || paramType.Sel.Name != "Token" {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func shouldBeIgnored(objectName string) bool {
