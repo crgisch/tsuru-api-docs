@@ -132,11 +132,19 @@ func handleComments(object *ast.Object, commentGroup *ast.CommentGroup, pkg *pac
 		}
 		return nil
 	}
+
 	var buf bytes.Buffer
 	for _, comment := range commentGroup.List {
-		buf.WriteString(strings.Replace(comment.Text, "// ", "", -1))
+		text := comment.Text
+		text = strings.Replace(text, "// ", "", -1)
+		text = strings.Replace(text, "//\t", "\t", -1)
+		text = strings.Replace(text, "//", "", -1)
+		text = strings.Replace(text, "\t", "  ", -1)
+
+		buf.WriteString(text)
 		buf.WriteString("\n")
 	}
+
 	var parsed map[string]interface{}
 	err := yaml.Unmarshal(buf.Bytes(), &parsed)
 	if err != nil {
