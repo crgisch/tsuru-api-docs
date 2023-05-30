@@ -35,7 +35,6 @@ func apiLoader() ([]*packages.Package, error) {
 	}
 	pkgsStr := []string{
 		"github.com/tsuru/tsuru/api",
-		"github.com/tsuru/tsuru/provision/docker",
 	}
 	pkgs, err := packages.Load(cfg, pkgsStr...)
 	if err != nil {
